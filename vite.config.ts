@@ -20,5 +20,10 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       }
+        build: {
+          outDir: 'dist',
+          assetsDir: 'assets',
+          emptyOutDir: true
+        }
     };
 });
