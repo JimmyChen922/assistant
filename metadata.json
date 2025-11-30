@@ -1,0 +1,5 @@
+{
+  "name": "Copy of mcLogViewer_v1127_ImproveAgentCapabilities_s",
+  "description": "An integrated platform for analyzing flight log CSV files, visualizing data through interactive charts, and providing tools for RMA inspection logging.",
+  "requestFramePermissions": []
+}

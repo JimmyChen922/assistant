@@ -1,0 +1,28 @@
+{
+  "name": "flight-log-analyzer",
+  "version": "1.0.0",
+  "description": "An integrated platform for analyzing flight log CSV files, visualizing data through interactive charts, and providing tools for RMA inspection logging.",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^0.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.7",
+    "@babel/preset-env": "^7.24.7",
+    "@babel/preset-react": "^7.24.7",
+    "@babel/preset-typescript": "^7.24.7",
+    "@types/react": "^18.2.21",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^5.2.0"
+  }
+}
