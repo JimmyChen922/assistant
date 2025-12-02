@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>飛行日誌分析儀</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+    <script>
+      // Configure Cesium
+      Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmYTkwNDk2Zi01ZDNjLTQyMDItOGNhOC1mMTBjZmY3M2Q2OTQiLCJpZCI6MzQzNjA4LCJpYXQiOjE3NjIwOTQwODh9.KrFGqiEa3DJciXncjSq4hVMzLRprioMrsQTMEhbJUr8';
+    </script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'bkg': 'hsl(var(--bkg))',
+              'content': 'hsl(var(--content))',
+              'text-primary': 'hsl(var(--text-primary))',
+              'text-secondary': 'hsl(var(--text-secondary))',
+              'border': 'hsl(var(--border))',
+              'primary': 'hsl(var(--primary))',
+              'primary-hover': 'hsl(var(--primary-hover))',
+              'secondary': 'hsl(var(--secondary))',
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      :root {
+        --bkg: 210 20% 98%;
+        --content: 0 0% 100%;
+        --text-primary: 215 28% 17%;
+        --text-secondary: 215 20% 65%;
+        --border: 214 32% 91%;
+        --primary: 221 83% 53%;
+        --primary-hover: 221 83% 43%;
+        --secondary: 217 19% 35%;
+      }
+      .dark {
+        --bkg: 222 47% 11%;
+        --content: 222 47% 15%;
+        --text-primary: 210 40% 98%;
+        --text-secondary: 215 20% 65%;
+        --border: 217 33% 25%;
+        --primary: 217 91% 60%;
+        --primary-hover: 217 91% 50%;
+        --secondary: 215 14% 34%;
+      }
+
+      /* Rules for when browser print is triggered (Ctrl+P) */
+      @media print {
+        .non-printable {
+            display: none !important;
+        }
+
+        /* Reset layout for printing - stack columns */
+        body, #root, #root > div {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        main {
+            display: block !important;
+            grid-template-columns: 1fr !important;
+        }
+        main > div, .printable-area {
+             width: 100% !important;
+             max-width: 100% !important;
+             grid-column: auto !important;
+        }
+        
+        /* General styling resets for readability */
+        body {
+          background-color: #fff !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .card {
+          border: 1px solid #ccc !important;
+          box-shadow: none !important;
+          page-break-inside: avoid;
+          margin-bottom: 1rem;
+        }
+        h2, p, label, input, div, span, h3, text, .recharts-text {
+          color: #000 !important;
+          fill: #000 !important;
+        }
+        input[type="text"], input[type="datetime-local"] {
+          border: 1px solid #ccc !important;
+          background-color: #f9f9f9 !important;
+        }
+        
+        /* Notes handling */
+        #notes-area { display: none !important; }
+        #notes-print-content { 
+          display: block !important; 
+          white-space: pre-wrap;
+          word-break: break-word;
+          min-height: 6rem;
+          padding: 0.5rem;
+          border: 1px solid #ddd;
+          font-size: 14px;
+        }
+        
+        /* Hide footer */
+        footer {
+          display: none !important;
+        }
+      }
+
+      /* Leaflet custom styles */
+      .leaflet-container {
+        border-radius: 0.5rem;
+      }
+      .leaflet-control-attribution a {
+        color: hsl(var(--primary)) !important;
+      }
+      .dark .map-tiles-osm {
+        filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+      }
+    </style>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@19.2.0/",
+    "react/": "https://aistudiocdn.com/react@19.2.0/",
+    "recharts": "https://aistudiocdn.com/recharts@3.3.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assistant/assets/index-CJ7EDj90.js"></script>
+  <link rel="stylesheet" crossorigin href="/assistant/assets/index-Bll7pRSP.css">
+</head>
+  <body class="bg-bkg text-text-primary">
+    <div id="root"></div>
+  </body>
+</html>
