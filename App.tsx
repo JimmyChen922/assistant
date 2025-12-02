@@ -1,9 +1,10 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { LeftPanel } from './components/LeftPanel.tsx';
 import { RightPanel } from './components/RightPanel/RightPanel.tsx';
 import { LogData, FlightInfo, ChartGroup, ActionLog, FlightPathPoint } from './types.ts';
 import { processRawData, processMetadata } from './services/logProcessor.ts';
+import { LocalKeys } from './localStorage/LocalKeys.ts';
 
 export default function App() {
     const [logData, setLogData] = useState<LogData | null>(null);
@@ -13,13 +14,43 @@ export default function App() {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
     const [activeChartGroups, setActiveChartGroups] = useState<ChartGroup[]>(['power']);
-    const [isSmooth, setIsSmooth] = useState<boolean>(true);
-    const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+    const [isSmooth, setIsSmooth] = useState<boolean>(() => {
+        const saved = localStorage.getItem(LocalKeys.isSmooth);
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+        const saved = localStorage.getItem(LocalKeys.isDarkMode);
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [showCesium, setShowCesium] = useState<boolean>(() => {
+        const saved = localStorage.getItem(LocalKeys.showCesium);
+        return saved !== null ? JSON.parse(saved) : false;
+    });
     const [actionLogs, setActionLogs] = useState<ActionLog[]>([{ time: new Date(), message: '頁面已載入。' }]);
     const [syncTime, setSyncTime] = useState<number | null>(null);
     const [rawCsvData, setRawCsvData] = useState<any[] | null>(null);
-    const [showCesium, setShowCesium] = useState<boolean>(false);
-    
+
+    // 同步 isSmooth 到 localStorage
+    useEffect(() => {
+        localStorage.setItem('isSmooth', JSON.stringify(isSmooth));
+    }, [isSmooth]);
+
+    // 同步 isDarkMode 到 localStorage
+    useEffect(() => {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+    }, [isDarkMode]);
+
+    // 同步 showCesium 到 localStorage
+    useEffect(() => {
+        localStorage.setItem('showCesium', JSON.stringify(showCesium));
+    }, [showCesium]);
+
+
     const addActionLog = useCallback((message: string) => {
         setActionLogs(prev => [...prev, { time: new Date(), message }]);
     }, []);
@@ -67,22 +98,13 @@ export default function App() {
     }, [addActionLog]);
 
     const toggleTheme = useCallback(() => {
-        setIsDarkMode(prev => {
-            const newIsDark = !prev;
-            if (newIsDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            addActionLog(`已切換至${newIsDark ? '深色' : '淺色'}模式。`);
-            return newIsDark;
-        });
-    }, [addActionLog]);
-    
+        setIsDarkMode(!isDarkMode);
+    }, [addActionLog, isDarkMode]);
+
     const handleChartGroupToggle = useCallback((group: ChartGroup) => {
-        setActiveChartGroups(prev => 
-            prev.includes(group) 
-                ? prev.filter(g => g !== group) 
+        setActiveChartGroups(prev =>
+            prev.includes(group)
+                ? prev.filter(g => g !== group)
                 : [...prev, group]
         );
     }, []);
@@ -113,12 +135,12 @@ export default function App() {
                     <LeftPanel {...leftPanelProps} />
                 </div>
                 <div className="lg:col-span-7">
-                    <RightPanel 
+                    <RightPanel
                         logData={logData}
                         flightInfo={flightInfo}
                         flightPath={flightPath}
                         rawCsvData={rawCsvData}
-                        activeChartGroups={activeChartGroups} 
+                        activeChartGroups={activeChartGroups}
                         isSmooth={isSmooth}
                         onTimeSync={setSyncTime}
                         syncTime={syncTime}
