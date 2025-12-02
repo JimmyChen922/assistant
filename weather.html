@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiRC- 台灣測站氣象資料查詢</title>
+    <!-- Bootstrap CSS for styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        body { padding: 20px; }
+        .table-container { margin-top: 0; }
+        table { 
+            width: 100%; 
+            table-layout: fixed;
+        }
+        th, td { 
+            text-align: center; 
+            padding: 12px 8px;
+            font-size: 14px;
+        }
+        
+        /* 地圖樣式 */
+        #map { 
+            height: 500px; 
+            width: 100%; 
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .map-container {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        
+        /* 左右布局樣式 */
+        .main-content {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .left-panel {
+            flex: 1;
+            min-width: 0;
+            max-width: 50%;
+            overflow-x: auto;
+        }
+        
+        .right-panel {
+            flex: 1;
+            min-width: 0;
+            max-width: 50%;
+        }
+        
+        /* 表頭樣式 */
+        .table-dark,
+        thead.table-dark,
+        .table thead.table-dark,
+        .table thead.table-dark tr {
+            background-color: #0047AB !important;
+        }
+        
+        .table-dark th,
+        thead.table-dark th,
+        .table thead.table-dark th {
+            color: #000000 !important;
+            font-weight: bold;
+            background-color: #0047AB !important;
+        }
+        
+        /* 強制布局控制 */
+        .container {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .main-content {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            width: 100% !important;
+        }
+        
+        .left-panel {
+            flex: 0 0 60% !important;
+            max-width: 60% !important;
+            overflow-x: auto;
+        }
+        
+        .right-panel {
+            flex: 0 0 40% !important;
+            max-width: 40% !important;
+        }
+        
+        /* 風速警告樣式 */
+        .wind-warning {
+            color: #dc3545 !important;
+            font-weight: bold;
+            background-color: #fff5f5 !important;
+        }
+        
+        .wind-alert {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        /* 響應式布局 */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            #map { height: 300px; }
+            .left-panel, .right-panel {
+                max-width: 100%;
+            }
+        }
+        
+        /* 版權資訊樣式 */
+        #credit {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            font-size: 12px;
+            color: #aaa;
+            cursor: pointer;
+            user-select: none;
+        }
+        #credit:hover {
+            color: #555;
+        }
+        
+        /* 天氣圖標樣式 */
+        .weather-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+        }
+        
+        .temp-hot { background-color: #ff4444; }
+        .temp-warm { background-color: #ff8800; }
+        .temp-mild { background-color: #44aa44; }
+        .temp-cool { background-color: #4488ff; }
+        .temp-cold { background-color: #4444ff; }
+        
+        /* 響應式布局 */
+        @media (max-width: 768px) {
+            #map { height: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center">CiRC- 台灣測站氣象資料查詢</h2>
+        <form id="weatherForm" class="mb-3">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="dateTime" class="form-label">日期與時間</label>
+                    <input type="datetime-local" class="form-control" id="dateTime" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="location" class="form-label">地點</label>
+                    <input type="text" class="form-control" id="location" value="鞍部" placeholder="請輸入測站名稱">
+                </div>
+                <div class="col-md-3">
+                    <label for="apiKey" class="form-label">API 授權碼</label>
+                    <input type="password" class="form-control" id="apiKey" value="CWA-BC818A75-95F0-4917-AE45-2459483BDCD9" placeholder="請輸入CWA API授權碼" required>
+                </div>
+                <div class="col-md-2 align-self-end">
+                    <button type="submit" class="btn btn-primary w-100" id="queryBtn">
+                        <span class="spinner-border spinner-border-sm d-none" id="loadingSpinner"></span>
+                        <span id="btnText">查詢</span>
+                    </button>
+                </div>
+                <div class="col-md-1 align-self-end">
+                    <button type="button" class="btn btn-info w-100" id="debugBtn" onclick="debugAPI()">
+                        除錯
+                    </button>
+                </div>
+                <div class="col-md-1 align-self-end">
+                    <button type="button" class="btn btn-success w-100" id="refreshMapBtn" onclick="loadAllStationsWeather()">
+                        更新地圖
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- 錯誤訊息顯示區域 -->
+        <div id="errorAlert" class="alert alert-danger d-none" role="alert">
+            <strong>錯誤：</strong><span id="errorMessage"></span>
+        </div>
+
+        <!-- 成功訊息顯示區域 -->
+        <div id="successAlert" class="alert alert-success d-none" role="alert">
+            <strong>成功：</strong>資料載入完成！
+        </div>
+
+        <!-- 主要內容區域 - 左右布局 -->
+        <div class="main-content">
+            <!-- 左側面板 - 資料表格 -->
+            <div class="left-panel">
+                <h4 class="text-center mb-3">氣象資料詳細資訊</h4>
+        <div class="table-container">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>觀測時間</th>
+                        <th>溫度 (°C)</th>
+                        <th>天氣</th>
+                                <th>風向 (度)</th>
+                                <th>風力 (m/s)</th>
+                                <th>陣風 (m/s)</th>
+                                <th>能見度</th>
+                        <th>相對溼度 (%)</th>
+                        <th>海平面氣壓 (百帕)</th>
+                        <th>當日累積雨量 (毫米)</th>
+                        <th>日照時數 (小時)</th>
+                    </tr>
+                </thead>
+                <tbody id="weatherTableBody">
+                    <!-- 資料將由 JavaScript 動態填充 -->
+                </tbody>
+            </table>
+                </div>
+                
+                <!-- 風速警告訊息區域 -->
+                <div id="windAlert" class="wind-alert d-none">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    風速過大，不建議進行無人機操作
+                </div>
+            </div>
+
+            <!-- 右側面板 - 台灣地圖 -->
+            <div class="right-panel">
+                <h4 class="text-center mb-3">台灣地圖</h4>
+                <div class="map-container">
+                    <div id="map"></div>
+                    <div class="text-center mt-2">
+                        <small class="text-muted">點擊地圖上的測站圖標查看詳細天氣資訊</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and Popper.js -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Leaflet JS for map -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 地圖相關變數
+        let map;
+        let weatherMarkers = [];
+        
+        // 台灣主要測站座標資料
+        const taiwanStations = [
+            { name: "台北", lat: 25.0330, lng: 121.5654, code: "台北" },
+            { name: "台中", lat: 24.1477, lng: 120.6736, code: "台中" },
+            { name: "高雄", lat: 22.6273, lng: 120.3014, code: "高雄" },
+            { name: "基隆", lat: 25.1276, lng: 121.7395, code: "基隆" },
+            { name: "新竹", lat: 24.8066, lng: 120.9686, code: "新竹" },
+            { name: "嘉義", lat: 23.4871, lng: 120.4488, code: "嘉義" },
+            { name: "台南", lat: 23.0000, lng: 120.2000, code: "台南" },
+            { name: "花蓮", lat: 23.9739, lng: 121.6014, code: "花蓮" },
+            { name: "台東", lat: 22.7554, lng: 121.1440, code: "台東" },
+            { name: "宜蘭", lat: 24.7570, lng: 121.7530, code: "宜蘭" },
+            { name: "桃園", lat: 24.9936, lng: 121.3010, code: "桃園" },
+            { name: "新北", lat: 25.0169, lng: 121.4628, code: "新北" },
+            { name: "苗栗", lat: 24.5601, lng: 120.8214, code: "苗栗" },
+            { name: "彰化", lat: 24.0800, lng: 120.5400, code: "彰化" },
+            { name: "南投", lat: 23.9100, lng: 120.6800, code: "南投" },
+            { name: "雲林", lat: 23.7000, lng: 120.4300, code: "雲林" },
+            { name: "屏東", lat: 22.6760, lng: 120.4900, code: "屏東" },
+            { name: "澎湖", lat: 23.5694, lng: 119.5800, code: "澎湖" },
+            { name: "金門", lat: 24.4500, lng: 118.3200, code: "金門" },
+            { name: "連江", lat: 26.1500, lng: 119.9500, code: "連江" },
+            { name: "鞍部", lat: 25.1833, lng: 121.5333, code: "鞍部" }
+        ];
+
+        // 初始化地圖
+        function initMap() {
+            map = L.map('map').setView([23.5, 121], 7);
+            
+            // 加入地圖圖層
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // 載入所有測站的天氣資料
+            loadAllStationsWeather();
+        }
+
+        // 載入所有測站的天氣資料
+        async function loadAllStationsWeather() {
+            const apiKey = document.getElementById("apiKey").value.trim();
+            if (!apiKey) {
+                console.log('API授權碼未設定，無法載入地圖資料');
+                return;
+            }
+
+            // 清除現有的標記
+            weatherMarkers.forEach(marker => map.removeLayer(marker));
+            weatherMarkers = [];
+
+            // 並行載入所有測站資料
+            const promises = taiwanStations.map(station => loadStationWeather(apiKey, station));
+            await Promise.allSettled(promises);
+        }
+
+        // 載入單一測站天氣資料
+        async function loadStationWeather(apiKey, station) {
+            try {
+                const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&locationName=${station.code}&format=JSON`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                if (!data.records || !data.records.Station || data.records.Station.length === 0) return;
+                
+                const stationData = data.records.Station[0];
+                const weatherElements = stationData.WeatherElement;
+                
+                // 提取關鍵資料
+                const temp = parseFloat(weatherElements.AirTemperature) || 0;
+                const weather = weatherElements.Weather || 'N/A';
+                const humidity = weatherElements.RelativeHumidity || 'N/A';
+                
+                // 根據溫度決定圖標顏色
+                let tempClass = 'temp-mild';
+                if (temp >= 30) tempClass = 'temp-hot';
+                else if (temp >= 25) tempClass = 'temp-warm';
+                else if (temp >= 20) tempClass = 'temp-mild';
+                else if (temp >= 15) tempClass = 'temp-cool';
+                else tempClass = 'temp-cold';
+                
+                // 創建自定義圖標
+                const customIcon = L.divIcon({
+                    className: 'weather-icon ' + tempClass,
+                    html: Math.round(temp) + '°',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+                
+                // 創建標記
+                const marker = L.marker([station.lat, station.lng], { icon: customIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="text-align: center;">
+                            <h6><strong>${station.name}</strong></h6>
+                            <p><strong>溫度:</strong> ${temp.toFixed(1)}°C</p>
+                            <p><strong>天氣:</strong> ${weather}</p>
+                            <p><strong>溼度:</strong> ${humidity}%</p>
+                            <button class="btn btn-sm btn-primary" onclick="queryStationWeather('${station.code}')">
+                                查看詳細資料
+                            </button>
+                        </div>
+                    `);
+                
+                weatherMarkers.push(marker);
+                
+            } catch (error) {
+                console.log(`載入 ${station.name} 資料失敗:`, error);
+            }
+        }
+
+        // 查詢特定測站詳細資料
+        function queryStationWeather(stationCode) {
+            document.getElementById('location').value = stationCode;
+            document.getElementById('weatherForm').dispatchEvent(new Event('submit'));
+        }
+        
+        // 在地圖上標示特定地點
+        function highlightLocationOnMap(locationName) {
+            // 清除現有的高亮標記
+            if (window.highlightMarker) {
+                map.removeLayer(window.highlightMarker);
+            }
+            
+            // 尋找對應的測站資料
+            const station = taiwanStations.find(s => s.name === locationName || s.code === locationName);
+            if (station) {
+                // 創建高亮標記
+                const highlightIcon = L.divIcon({
+                    className: 'highlight-marker',
+                    html: '<div style="background-color: #ff0000; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">📍</div>',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                });
+                
+                // 添加高亮標記到地圖
+                window.highlightMarker = L.marker([station.lat, station.lng], { icon: highlightIcon })
+                    .addTo(map)
+                    .bindPopup(`<strong>${station.name}</strong><br>已選取此測站`);
+                
+                // 將地圖視圖移動到該位置
+                map.setView([station.lat, station.lng], 10);
+            }
+        }
+
+        // CWA API 相關函數
+        function getElementValue(elements, elementName) {
+            // 檢查 elements 是否為陣列
+            if (Array.isArray(elements)) {
+                const element = elements.find(el => el.elementName === elementName);
+                return element ? element.elementValue : 'N/A';
+            }
+            // 如果不是陣列，直接從物件中取值
+            return elements && elements[elementName] ? elements[elementName] : 'N/A';
+        }
+
+        function formatValue(value, unit = '') {
+            if (value === 'N/A' || value === null || value === undefined) {
+                return 'N/A';
+            }
+            // 處理特殊值，如-99表示無資料
+            if (value === '-99' || value === -99) {
+                return 'N/A';
+            }
+            const numValue = parseFloat(value);
+            if (isNaN(numValue)) {
+                return 'N/A';
+            }
+            return numValue.toFixed(1) + unit;
+        }
+
+        function showError(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            const successAlert = document.getElementById('successAlert');
+            
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('d-none');
+            successAlert.classList.add('d-none');
+        }
+
+        function showSuccess() {
+            const errorAlert = document.getElementById('errorAlert');
+            const successAlert = document.getElementById('successAlert');
+            
+            errorAlert.classList.add('d-none');
+            successAlert.classList.remove('d-none');
+        }
+
+        function hideAlerts() {
+            const errorAlert = document.getElementById('errorAlert');
+            const successAlert = document.getElementById('successAlert');
+            
+            errorAlert.classList.add('d-none');
+            successAlert.classList.add('d-none');
+        }
+
+        function setLoadingState(isLoading) {
+            const queryBtn = document.getElementById('queryBtn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const btnText = document.getElementById('btnText');
+            
+            if (isLoading) {
+                queryBtn.disabled = true;
+                loadingSpinner.classList.remove('d-none');
+                btnText.textContent = '查詢中...';
+            } else {
+                queryBtn.disabled = false;
+                loadingSpinner.classList.add('d-none');
+                btnText.textContent = '查詢';
+            }
+        }
+
+        function updateTable(weatherData) {
+            const tableBody = document.getElementById('weatherTableBody');
+            tableBody.innerHTML = '';
+
+            const row = document.createElement('tr');
+            
+            // 檢查風速是否超過5級風 (9 m/s)
+            const windSpeed = parseFloat(weatherData.風力.replace(/[^\d.-]/g, '')) || 0;
+            const windGust = parseFloat(weatherData.陣風.replace(/[^\d.-]/g, '')) || 0;
+            const maxWindSpeed = Math.max(windSpeed, windGust);
+            
+            // 風速警告樣式
+            const windSpeedClass = maxWindSpeed >= 9 ? 'wind-warning' : '';
+            const windGustClass = windGust >= 9 ? 'wind-warning' : '';
+            
+            row.innerHTML = `
+                <td>${weatherData.觀測時間}</td>
+                <td>${weatherData.溫度}</td>
+                <td>${weatherData.天氣}</td>
+                <td>${weatherData.風向}</td>
+                <td class="${windSpeedClass}">${weatherData.風力}</td>
+                <td class="${windGustClass}">${weatherData.陣風}</td>
+                <td>${weatherData.能見度}</td>
+                <td>${weatherData.相對溼度}</td>
+                <td>${weatherData.海平面氣壓}</td>
+                <td>${weatherData.累積雨量}</td>
+                <td>${weatherData.日照時數}</td>
+            `;
+            tableBody.appendChild(row);
+            
+            // 顯示或隱藏風速警告
+            const windAlert = document.getElementById('windAlert');
+            if (maxWindSpeed >= 9) {
+                windAlert.classList.remove('d-none');
+            } else {
+                windAlert.classList.add('d-none');
+            }
+        }
+
+        // 表單提交事件
+        document.getElementById("weatherForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            const apiKey = document.getElementById("apiKey").value.trim();
+            const location = document.getElementById("location").value;
+
+            // 驗證輸入
+            if (!apiKey) {
+                showError('請輸入API授權碼');
+                return;
+            }
+            //CWA-BC818A75-95F0-4917-AE45-2459483BDCD9
+
+            // 隱藏之前的訊息
+            hideAlerts();
+            
+            // 設定載入狀態
+            setLoadingState(true);
+
+            try {
+                // 構建API URL
+                const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&locationName=${location}&format=JSON`;
+                
+                console.log('正在請求API:', apiUrl);
+                
+                // 發送API請求
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP錯誤: ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API回應:', data);
+                
+                // 檢查API回應
+                if (!data.records || !data.records.Station || data.records.Station.length === 0) {
+                    throw new Error('找不到指定測站的資料');
+                }
+                
+                const locationData = data.records.Station[0];
+                const weatherElements = locationData.WeatherElement;
+                const observationTime = locationData.ObsTime.DateTime;
+                
+                // 提取氣象資料 - 根據實際API結構
+                const weatherData = {
+                    '觀測時間': observationTime,
+                    '溫度': formatValue(weatherElements.AirTemperature, '°C'),
+                    '天氣': weatherElements.Weather || 'N/A',
+                    '風向': formatValue(weatherElements.WindDirection, '度'),
+                    '風力': formatValue(weatherElements.WindSpeed, 'm/s'),
+                    '陣風': formatValue(weatherElements.GustInfo?.PeakGustSpeed, 'm/s'),
+                    '能見度': weatherElements.VisibilityDescription || 'N/A',
+                    '相對溼度': formatValue(weatherElements.RelativeHumidity, '%'),
+                    '海平面氣壓': formatValue(weatherElements.AirPressure, '百帕'),
+                    '累積雨量': formatValue(weatherElements.Now?.Precipitation, '毫米'),
+                    '日照時數': formatValue(weatherElements.SunshineDuration, '小時')
+                };
+                
+                console.log('處理後的氣象資料:', weatherData);
+                
+                // 更新表格
+                updateTable(weatherData);
+                showSuccess();
+                
+                // 在地圖上標示選取的地點
+                highlightLocationOnMap(location);
+                
+            } catch (error) {
+                console.error('API請求錯誤:', error);
+                showError(`無法獲取氣象資料: ${error.message}`);
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        // 除錯函數
+        async function debugAPI() {
+            const apiKey = document.getElementById("apiKey").value.trim();
+            const location = document.getElementById("location").value;
+
+            if (!apiKey) {
+                alert('請輸入API授權碼');
+                return;
+            }
+            
+            try {
+                const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&locationName=${location}&format=JSON`;
+                console.log('=== 除錯模式 ===');
+                console.log('API URL:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                console.log('HTTP狀態:', response.status, response.statusText);
+                
+                const data = await response.json();
+                console.log('=== 完整API回應 ===');
+                console.log(JSON.stringify(data, null, 2));
+                
+                if (data.records && data.records.Station) {
+                    console.log('=== 測站數量 ===', data.records.Station.length);
+                    data.records.Station.forEach((station, index) => {
+                        console.log(`=== 測站 ${index} ===`);
+                        console.log('測站名稱:', station.StationName);
+                        console.log('觀測時間:', station.ObsTime);
+                        console.log('氣象元素:', station.WeatherElement);
+                    });
+                } else {
+                    console.log('API回應中沒有找到測站資料');
+                }
+                
+                alert('除錯資訊已輸出到控制台，請按F12查看');
+                
+            } catch (error) {
+                console.error('除錯API請求錯誤:', error);
+                alert('除錯失敗: ' + error.message);
+            }
+        }
+
+        // 頁面載入時設定預設時間和初始化地圖
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            
+            document.getElementById('dateTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            
+            // 初始化地圖
+            initMap();
+            
+            // 監聽地點輸入框變化
+            document.getElementById('location').addEventListener('input', function() {
+                const locationValue = this.value.trim();
+                if (locationValue) {
+                    highlightLocationOnMap(locationValue);
+                }
+            });
+        });
+    </script>
+    
+    <!-- 版權資訊 -->
+    <div id="credit" onclick="alert('設計者：Erica\n版本：v1.0\n日期：2025-10-25');">
+        © 2025 Erica
+    </div>
+</body>
+</html>

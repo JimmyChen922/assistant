@@ -9,6 +9,7 @@ import TrackerMap from '../TrackerMap.tsx';
 import TimelineControl from '../TimelineControl.tsx';
 import { LogCheckButtons } from '../LogCheckButtons.tsx';
 import { RightPanelTab } from './RightPanelConstant.ts';
+import Weather from '../weather/Weather.tsx';
 
 interface RightPanelProps {
     logData: LogData | null;
@@ -259,6 +260,16 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logData, flightInfo, fli
                 >
                     📊 報表
                 </button>
+                <button
+                    onClick={() => setMainTab(RightPanelTab.Weather)}
+                    className={`px-4 py-2 rounded-t-md text-sm font-semibold transition-all ${mainTab === RightPanelTab.Weather
+                            ? 'bg-primary text-white'
+                            : 'bg-content text-text-primary hover:bg-content-hover'
+                        }`}
+                    aria-pressed={mainTab === RightPanelTab.Weather}
+                >
+                    🌤️ 氣象
+                </button>
                 {hasApiKey && (
                     <button
                         onClick={() => setMainTab(RightPanelTab.GeminiAnalysis)}
@@ -271,9 +282,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logData, flightInfo, fli
                         Gemini助手
                     </button>
                 )}
-            </div>
-
-            {/* Map Tab Content */}
+                
+            </div>            {/* Map Tab Content */}
             {mainTab === RightPanelTab.TrackerMap && (
                 <div className="flex flex-col gap-4">
                     <TrackerMap
@@ -399,6 +409,12 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logData, flightInfo, fli
                     <h2 className="text-lg font-semibold border-b border-border pb-2 mb-4 text-text-primary">G小姐姐助理</h2>
                     <GeminiAnalysisPanel rawData={rawCsvData} />
                 </Card>
+            )}
+
+            {mainTab === RightPanelTab.Weather && (
+                <div className="flex flex-col gap-4">
+                    <Weather isDarkMode={isDarkMode} />
+                </div>
             )}
         </div>
     );
