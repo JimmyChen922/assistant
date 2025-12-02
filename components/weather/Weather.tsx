@@ -122,15 +122,10 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
 
     const loadStationWeather = async (apiKeyStr: string, station: Station) => {
         try {
-            const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKeyStr}&locationName=${station.code}&format=JSON`;
-            const response = await fetch(apiUrl);
-            
-            if (!response.ok) return;
-            
-            const data = await response.json();
-            if (!data.records || !data.records.Station || data.records.Station.length === 0) return;
-            
-            const stationData = data.records.Station[0];
+            // 檢查全站點數據是否已經在 allStationsData 中
+            const stationData = allStationsData.current.find((s: any) => s.StationName === station.name || s.StationCode === station.code);
+            if (!stationData) return;
+
             const weatherElements = stationData.WeatherElement;
             
             const temp = parseFloat(weatherElements.AirTemperature) || 0;
@@ -169,6 +164,8 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
         }
     };
 
+    const allStationsData = useRef<any[]>([]);
+
     const loadAllStationsWeather = async () => {
         if (!apiKey) return;
 
@@ -177,8 +174,31 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
         });
         weatherMarkersRef.current = [];
 
-        const promises = taiwanStations.map(station => loadStationWeather(apiKey, station));
-        await Promise.allSettled(promises);
+        try {
+            // 一次請求獲取所有測站數據
+            const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&format=JSON`;
+            const response = await fetch(apiUrl);
+            
+            if (!response.ok) {
+                console.error('API 請求失敗:', response.statusText);
+                return;
+            }
+            
+            const data = await response.json();
+            if (!data.records || !data.records.Station || data.records.Station.length === 0) {
+                console.log('未找到測站數據');
+                return;
+            }
+
+            // 保存全部測站數據
+            allStationsData.current = data.records.Station;
+
+            // 根據 taiwanStations 處理每個測站
+            const promises = taiwanStations.map(station => loadStationWeather(apiKey, station));
+            await Promise.allSettled(promises);
+        } catch (error) {
+            console.error('載入測站天氣失敗:', error);
+        }
     };
 
     const highlightLocationOnMap = (locationName: string) => {
@@ -211,6 +231,22 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
         }
     };
 
+    const queryStationWeather = (stationCode: string) => {
+        setLocation(stationCode);
+        // 延遲執行以確保狀態已更新
+        setTimeout(() => {
+            const form = document.querySelector('form') as HTMLFormElement;
+            if (form) {
+                form.dispatchEvent(new Event('submit', { bubbles: true }));
+            }
+        }, 0);
+    };
+
+    // 將 queryStationWeather 綁定到 window 全局對象
+    useEffect(() => {
+        (window as any).queryStationWeather = queryStationWeather;
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -225,8 +261,8 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
         setLoading(true);
 
         try {
-            const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&locationName=${location}&format=JSON`;
-            
+            const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&StationName=${location}&format=JSON`;
+            console.log('查詢API URL:', apiUrl);
             const response = await fetch(apiUrl);
             
             if (!response.ok) {
@@ -272,40 +308,6 @@ const Weather:FC<WeatherProps> = ({isDarkMode}) => {
             setSuccess(false);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleDebug = async () => {
-        if (!apiKey.trim()) {
-            alert('請輸入API授權碼');
-            return;
-        }
-
-        try {
-            const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=${apiKey}&locationName=${location}&format=JSON`;
-            console.log('=== 除錯模式 ===');
-            console.log('API URL:', apiUrl);
-            
-            const response = await fetch(apiUrl);
-            console.log('HTTP狀態:', response.status, response.statusText);
-            
-            const data = await response.json();
-            console.log('=== 完整API回應 ===');
-            console.log(JSON.stringify(data, null, 2));
-            
-            if (data.records && data.records.Station) {
-                console.log('=== 測站數量 ===', data.records.Station.length);
-                data.records.Station.forEach((station: any, index: number) => {
-                    console.log(`=== 測站 ${index} ===`);
-                    console.log('測站名稱:', station.StationName);
-                    console.log('觀測時間:', station.ObsTime);
-                    console.log('氣象元素:', station.WeatherElement);
-                });
-            }
-            
-            alert('除錯資訊已輸出到控制台');
-        } catch (err) {
-            alert('除錯失敗: ' + (err instanceof Error ? err.message : '未知錯誤'));
         }
     };
 
